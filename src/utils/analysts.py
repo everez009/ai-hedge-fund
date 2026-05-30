@@ -20,6 +20,7 @@ from src.agents.mohnish_pabrai import mohnish_pabrai_agent
 from src.agents.nassim_taleb import nassim_taleb_agent
 from src.agents.news_sentiment import news_sentiment_agent
 from src.agents.growth_agent import growth_analyst_agent
+from src.agents.crypto_analyst import crypto_analyst_agent
 
 # Define analyst configuration - single source of truth
 ANALYST_CONFIG = {
@@ -174,6 +175,14 @@ ANALYST_CONFIG = {
         "agent_func": valuation_analyst_agent,
         "type": "analyst",
         "order": 18,
+    },
+    "crypto_analyst": {
+        "display_name": "Crypto Analyst",
+        "description": "Cryptocurrency Specialist",
+        "investing_style": "Specializes in cryptocurrency analysis using on-chain metrics, network fundamentals, and crypto-specific indicators for Bitcoin, Ethereum, and altcoins.",
+        "agent_func": crypto_analyst_agent,
+        "type": "analyst",
+        "order": 19,
     },
 }
 
