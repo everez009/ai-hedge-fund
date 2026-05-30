@@ -2,11 +2,21 @@ import json
 from datetime import datetime, timedelta
 
 from langchain_core.messages import HumanMessage
+from langchain_core.prompts import ChatPromptTemplate
+from pydantic import BaseModel
+from typing_extensions import Literal
 
 from src.graph.state import AgentState, show_agent_reasoning
 from src.tools.api import get_company_news, get_insider_trades
 from src.utils.api_key import get_api_key_from_state
+from src.utils.llm import call_llm
 from src.utils.progress import progress
+
+
+class NancyPelosiSignal(BaseModel):
+    signal: Literal["bullish", "bearish", "neutral"]
+    confidence: float
+    reasoning: str
 
 
 def nancy_pelosi_agent(state: AgentState, agent_id: str = "nancy_pelosi_agent"):
@@ -50,25 +60,31 @@ def nancy_pelosi_agent(state: AgentState, agent_id: str = "nancy_pelosi_agent"):
             signal = "neutral"
 
         confidence = round(min(95, max(5, abs(weighted_score - 5) * 18 + 35)), 2)
-        reasoning = {
+        analysis_data = {
+            "signal": signal,
+            "confidence": confidence,
+            "score": weighted_score,
+            "max_score": 10,
             "disclosure_momentum": disclosure_momentum,
             "trade_conviction": conviction,
             "policy_catalysts": policy_catalysts,
-            "final_analysis": {
-                "signal": signal,
-                "confidence": confidence,
-                "weighted_score": round(weighted_score, 2),
-                "framework": "Tracks institutional insider disclosure momentum as a proxy for politically informed market interest; this is not a claim about any specific lawmaker's current holdings.",
-            },
         }
+
+        progress.update_status(agent_id, ticker, "Generating Pelosi-style analysis")
+        pelosi_output = generate_pelosi_output(
+            ticker=ticker,
+            analysis_data=analysis_data,
+            state=state,
+            agent_id=agent_id,
+        )
 
         pelosi_analysis[ticker] = {
-            "signal": signal,
-            "confidence": confidence,
-            "reasoning": reasoning,
+            "signal": pelosi_output.signal,
+            "confidence": pelosi_output.confidence,
+            "reasoning": pelosi_output.reasoning,
         }
 
-        progress.update_status(agent_id, ticker, "Done", analysis=json.dumps(reasoning, indent=4))
+        progress.update_status(agent_id, ticker, "Done", analysis=pelosi_output.reasoning)
 
     message = HumanMessage(content=json.dumps(pelosi_analysis), name=agent_id)
 
@@ -226,6 +242,73 @@ def analyze_policy_catalysts(company_news: list) -> dict:
         "matched_terms": sorted(matched_terms),
         "matched_articles": matched_articles,
     }
+
+
+def generate_pelosi_output(
+    ticker: str,
+    analysis_data: dict,
+    state: AgentState,
+    agent_id: str,
+) -> NancyPelosiSignal:
+    template = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are a Nancy Pelosi-inspired AI analyst, making investment decisions through a congressional-disclosure and policy-catalyst lens.
+
+                Focus on:
+                1. Disclosure momentum: whether recent trading disclosures skew toward accumulation or distribution.
+                2. Conviction: whether transaction values and concentration suggest meaningful positioning.
+                3. Policy catalysts: whether headlines point to areas sensitive to federal spending, regulation, defense, chips, AI, healthcare, energy, infrastructure, or antitrust.
+
+                Important constraints:
+                - Do not claim to know Nancy Pelosi's current holdings or private intentions.
+                - Treat this as a public-disclosure momentum framework, not as financial advice.
+                - Be specific about the strongest bullish and bearish evidence.
+                - Explain the final stance in a concise, investor-style paragraph.
+
+                Return your final output strictly in JSON with the fields:
+                {{
+                  "signal": "bullish" | "bearish" | "neutral",
+                  "confidence": 0 to 100,
+                  "reasoning": "string"
+                }}
+                """,
+            ),
+            (
+                "human",
+                """Based on the following analysis data for {ticker}, produce the Nancy Pelosi-style investment signal.
+
+                Analysis Data:
+                {analysis_data}
+
+                Return only valid JSON with "signal", "confidence", and "reasoning".
+                """,
+            ),
+        ]
+    )
+
+    prompt = template.invoke({"analysis_data": json.dumps(analysis_data, indent=2), "ticker": ticker})
+
+    def create_default_signal():
+        return NancyPelosiSignal(
+            signal=analysis_data["signal"],
+            confidence=analysis_data["confidence"],
+            reasoning=(
+                f"{ticker} screens {analysis_data['signal']} under a public-disclosure momentum framework. "
+                f"Disclosure momentum score is {analysis_data['disclosure_momentum']['score']}/10, "
+                f"trade conviction score is {analysis_data['trade_conviction']['score']}/10, "
+                f"and policy catalyst score is {analysis_data['policy_catalysts']['score']}/10."
+            ),
+        )
+
+    return call_llm(
+        prompt=prompt,
+        pydantic_model=NancyPelosiSignal,
+        agent_name=agent_id,
+        state=state,
+        default_factory=create_default_signal,
+    )
 
 
 def _one_year_before(end_date: str) -> str:

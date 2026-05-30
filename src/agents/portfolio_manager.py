@@ -44,12 +44,13 @@ def portfolio_management_agent(state: AgentState, agent_id: str = "portfolio_man
             risk_manager_id = "risk_management_agent"  # Fallback for CLI
 
         risk_data = analyst_signals.get(risk_manager_id, {}).get(ticker, {})
-        position_limits[ticker] = risk_data.get("remaining_position_limit", 0.0)
-        current_prices[ticker] = float(risk_data.get("current_price", 0.0))
+        position_limits[ticker] = risk_data.get("remaining_position_limit", 0.0) if risk_data else 0.0
+        current_price_val = risk_data.get("current_price", 0.0) if risk_data else 0.0
+        current_prices[ticker] = float(current_price_val) if current_price_val is not None else 0.0
 
         # Calculate maximum shares allowed based on position limit and price
         if current_prices[ticker] > 0:
-            max_shares[ticker] = int(position_limits[ticker] // current_prices[ticker])
+            max_shares[ticker] = int(position_limits[ticker] // current_prices[ticker]) if current_prices[ticker] != 0 else 0
         else:
             max_shares[ticker] = 0
 
@@ -124,7 +125,7 @@ def compute_allowed_actions(
         if long_shares > 0:
             actions["sell"] = long_shares
         if cash > 0 and price > 0:
-            max_buy_cash = int(cash // price)
+            max_buy_cash = int(cash // price) if price != 0 else 0
             max_buy = max(0, min(max_qty, max_buy_cash))
             if max_buy > 0:
                 actions["buy"] = max_buy

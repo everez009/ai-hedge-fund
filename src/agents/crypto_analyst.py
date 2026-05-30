@@ -102,16 +102,8 @@ def crypto_analyst_agent(state: AgentState, agent_id: str = "crypto_analyst"):
     
     message = HumanMessage(content=json.dumps(crypto_analysis), name=agent_id)
     
-    if show_agent_reasoning():
-        print(f"\n{'='*80}")
-        print(f"CRYPTO ANALYST AGENT")
-        print(f"{'='*80}")
-        for ticker, analysis in crypto_analysis.items():
-            print(f"\n{ticker}:")
-            print(f"  Signal: {analysis['signal'].upper()}")
-            print(f"  Confidence: {analysis['confidence']}%")
-            print(f"  Reasoning: {analysis['reasoning'][:200]}...")
-        print(f"{'='*80}\n")
+    if state["metadata"].get("show_reasoning"):
+        show_agent_reasoning(crypto_analysis, agent_id)
     
     return {
         "messages": [message],
@@ -148,16 +140,16 @@ def analyze_onchain_metrics(ticker: str, prices: list) -> dict:
     volumes = [getattr(p, 'volume', 0) for p in prices]
     
     # Volume trend (proxy for network activity)
-    recent_vol = sum(volumes[-7:]) / 7 if len(volumes) >= 7 else sum(volumes) / len(volumes)
-    older_vol = sum(volumes[:-7]) / len(volumes[:-7]) if len(volumes) > 7 else recent_vol
+    recent_vol = sum(volumes[-7:]) / 7 if len(volumes) >= 7 else sum(volumes) / len(volumes) if volumes else 0
+    older_vol = sum(volumes[:-7]) / len(volumes[:-7]) if len(volumes) > 7 and volumes[:-7] else 0
     vol_trend = (recent_vol - older_vol) / older_vol if older_vol > 0 else 0
     
     # Price momentum (proxy for adoption)
-    price_change = (closes[-1] - closes[0]) / closes[0] * 100
+    price_change = (closes[-1] - closes[0]) / closes[0] * 100 if closes[0] != 0 else 0
     
     # Volatility (crypto-specific risk metric)
-    daily_returns = [(closes[i] - closes[i-1]) / closes[i-1] for i in range(1, len(closes))]
-    volatility = (sum(r**2 for r in daily_returns) / len(daily_returns)) ** 0.5 * 100
+    daily_returns = [(closes[i] - closes[i-1]) / closes[i-1] for i in range(1, len(closes)) if closes[i-1] != 0]
+    volatility = (sum(r**2 for r in daily_returns) / len(daily_returns)) ** 0.5 * 100 if daily_returns else 0
     
     # Score calculation
     score = 50  # Base score
@@ -217,14 +209,14 @@ def analyze_crypto_technicals(prices: list) -> dict:
         if change > 0:
             gains.append(change)
             losses.append(0)
-        else:
+        elif change < 0:
             gains.append(0)
             losses.append(abs(change))
     
     avg_gain = sum(gains) / len(gains) if gains else 0
     avg_loss = sum(losses) / len(losses) if losses else 1
     rs = avg_gain / avg_loss if avg_loss != 0 else 0
-    rsi = 100 - (100 / (1 + rs))
+    rsi = 100 - (100 / (1 + rs)) if avg_loss != 0 else 50
     
     # MACD (Moving Average Convergence Divergence)
     ema_12 = sum(closes[-12:]) / 12 if len(closes) >= 12 else sum(closes) / len(closes)
@@ -298,7 +290,7 @@ def assess_crypto_sentiment(ticker: str, prices: list) -> dict:
     closes = [p.close for p in prices]
     
     # Recent performance
-    recent_return = (closes[-1] - closes[-7]) / closes[-7] * 100 if len(closes) >= 7 else 0
+    recent_return = (closes[-1] - closes[-7]) / closes[-7] * 100 if len(closes) >= 7 and closes[-7] != 0 else 0
     
     # Determine sentiment
     if recent_return > 15:

@@ -130,7 +130,9 @@ def analyze_disruptive_potential(metrics: list, financial_line_items: list) -> d
         growth_rates = []
         for i in range(len(revenues) - 1):
             if revenues[i] and revenues[i + 1]:
-                growth_rate = (revenues[i] - revenues[i + 1]) / abs(revenues[i + 1]) if revenues[i + 1] != 0 else 0
+                # Data is in reverse chronological order (recent first)
+                # So revenues[i] is more recent than revenues[i+1]
+                growth_rate = (revenues[i] - revenues[i + 1]) / revenues[i + 1] if revenues[i + 1] != 0 else 0
                 growth_rates.append(growth_rate)
 
         # Check if growth is accelerating (first growth rate higher than last, since they're in reverse order)
@@ -175,8 +177,9 @@ def analyze_disruptive_potential(metrics: list, financial_line_items: list) -> d
     operating_expenses = [item.operating_expense for item in financial_line_items if hasattr(item, "operating_expense") and item.operating_expense]
 
     if len(revenues) >= 2 and len(operating_expenses) >= 2:
-        rev_growth = (revenues[0] - revenues[-1]) / abs(revenues[-1])
-        opex_growth = (operating_expenses[0] - operating_expenses[-1]) / abs(operating_expenses[-1])
+        # Reverse order: index 0 is most recent
+        rev_growth = (revenues[0] - revenues[-1]) / revenues[-1] if revenues[-1] != 0 else 0
+        opex_growth = (operating_expenses[0] - operating_expenses[-1]) / operating_expenses[-1] if operating_expenses[-1] != 0 else 0
 
         if rev_growth > opex_growth:
             score += 2
@@ -228,7 +231,8 @@ def analyze_innovation_growth(metrics: list, financial_line_items: list) -> dict
     revenues = [item.revenue for item in financial_line_items if item.revenue]
 
     if rd_expenses and revenues and len(rd_expenses) >= 2:
-        rd_growth = (rd_expenses[0] - rd_expenses[-1]) / abs(rd_expenses[-1]) if rd_expenses[-1] != 0 else 0
+        # Reverse order: index 0 is most recent
+        rd_growth = (rd_expenses[0] - rd_expenses[-1]) / rd_expenses[-1] if rd_expenses[-1] != 0 else 0
         if rd_growth > 0.5:  # 50% growth in R&D
             score += 3
             details.append(f"Strong R&D investment growth: +{(rd_growth*100):.1f}%")
@@ -248,7 +252,8 @@ def analyze_innovation_growth(metrics: list, financial_line_items: list) -> dict
     # 2. Free Cash Flow Analysis
     fcf_vals = [item.free_cash_flow for item in financial_line_items if item.free_cash_flow]
     if fcf_vals and len(fcf_vals) >= 2:
-        fcf_growth = (fcf_vals[0] - fcf_vals[-1]) / abs(fcf_vals[-1])
+        # Reverse order: index 0 is most recent
+        fcf_growth = (fcf_vals[0] - fcf_vals[-1]) / fcf_vals[-1] if fcf_vals[-1] != 0 else 0
         positive_fcf_count = sum(1 for f in fcf_vals if f > 0)
 
         if fcf_growth > 0.3 and positive_fcf_count == len(fcf_vals):
@@ -283,7 +288,7 @@ def analyze_innovation_growth(metrics: list, financial_line_items: list) -> dict
     # 4. Capital Allocation Analysis
     capex = [item.capital_expenditure for item in financial_line_items if hasattr(item, "capital_expenditure") and item.capital_expenditure]
     if capex and revenues and len(capex) >= 2:
-        capex_intensity = abs(capex[0]) / revenues[0]
+        capex_intensity = abs(capex[0]) / revenues[0] if revenues[0] != 0 else 0
         capex_growth = (abs(capex[0]) - abs(capex[-1])) / abs(capex[-1]) if capex[-1] != 0 else 0
 
         if capex_intensity > 0.10 and capex_growth > 0.2:
@@ -298,7 +303,7 @@ def analyze_innovation_growth(metrics: list, financial_line_items: list) -> dict
     # 5. Growth Reinvestment Analysis
     dividends = [item.dividends_and_other_cash_distributions for item in financial_line_items if hasattr(item, "dividends_and_other_cash_distributions") and item.dividends_and_other_cash_distributions]
     if dividends and fcf_vals:
-        latest_payout_ratio = dividends[0] / fcf_vals[0] if fcf_vals[0] != 0 else 1
+        latest_payout_ratio = abs(dividends[0]) / fcf_vals[0] if fcf_vals[0] != 0 else 1
         if latest_payout_ratio < 0.2:  # Low dividend payout ratio suggests reinvestment focus
             score += 2
             details.append("Strong focus on reinvestment over dividends")
