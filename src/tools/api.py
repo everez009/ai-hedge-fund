@@ -61,7 +61,7 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
 
 
 def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None) -> list[Price]:
-    """Fetch price data from cache or API."""
+    """Fetch price data from cache or API (supports stocks, forex, commodities, indices)."""
     # Create a cache key that includes all parameters to ensure exact matches
     cache_key = f"{ticker}_{start_date}_{end_date}"
     
@@ -69,7 +69,47 @@ def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None)
     if cached_data := _cache.get_prices(cache_key):
         return [Price(**price) for price in cached_data]
 
-    # If not in cache, fetch from API
+    # Normalize ticker for classification
+    normalized_ticker = ticker.upper().replace("/", "").replace("_", "")
+    
+    # Check if this is a forex/commodity/index symbol
+    is_forex_type = (
+        len(normalized_ticker) == 6 and normalized_ticker.isalpha() or  # Forex: EURUSD
+        normalized_ticker.startswith("XAU") or normalized_ticker.startswith("XAG") or  # Gold/Silver
+        normalized_ticker in ["WTI", "BRENT", "NATGAS", "COPPER"] or  # Commodities
+        normalized_ticker in ["SPX", "NAS100", "US30", "GER30", "FTSE", "NIKKEI"] or  # Indices
+        normalized_ticker.endswith("USD") or normalized_ticker.endswith("EUR")  # Currency pairs
+    )
+    
+    # For forex/commodities/indices, use forex API adapters
+    if is_forex_type:
+        try:
+            from src.tools.forex_api import ForexDataProvider
+            forex_provider = ForexDataProvider()
+            forex_prices = forex_provider.get_prices(ticker, start_date, end_date)
+            
+            if forex_prices:
+                # Convert forex Price objects to the format expected by the system
+                prices = []
+                for fp in forex_prices:
+                    prices.append(Price(
+                        ticker=ticker,
+                        open=fp.open,
+                        high=fp.high,
+                        low=fp.low,
+                        close=fp.close,
+                        volume=fp.volume,
+                        time=fp.time
+                    ))
+                
+                # Cache the results
+                _cache.set_prices(cache_key, [p.model_dump() for p in prices])
+                return prices
+        except Exception as e:
+            logger.warning(f"Forex API failed for {ticker}: {e}")
+            # Fall through to stock API as fallback
+
+    # For stocks, use financialdatasets.ai API
     headers = {}
     financial_api_key = api_key or os.environ.get("FINANCIAL_DATASETS_API_KEY")
     if financial_api_key:
