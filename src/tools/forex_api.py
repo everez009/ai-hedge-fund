@@ -9,6 +9,7 @@ from src.data.models import Price
 from src.data.forex import TwelveDataAdapter, OandaAdapter
 from src.data.forex.itick import ITickAdapter
 from src.data.forex.dukascopy import DukascopyAdapter
+from src.data.forex.massive import MassiveAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +27,23 @@ class ForexDataProvider:
     def _initialize_adapters(self):
         """Initialize available data adapters based on API keys"""
         logger.info(
-            "Initializing ForexDataProvider adapters: itick=%s, twelvedata=%s, oanda=%s",
+            "Initializing ForexDataProvider adapters: massive=%s, itick=%s, twelvedata=%s, dukascopy=%s, oanda=%s",
+            bool(os.environ.get("MASSIVE_API_KEY")),
             bool(os.environ.get("ITICK_API_KEY")),
             bool(os.environ.get("TWELVEDATA_API_KEY")),
+            bool(os.environ.get("DUKASCOPY_API_URL") or os.environ.get("DUKASCOPY_API_KEY")),
             bool(os.environ.get("OANDA_API_KEY")),
         )
 
-        # iTick (Best for indices - unlimited free tier)
+        # Massive.com (Best for indices — 11,400+ indices, also forex & crypto)
+        if os.environ.get("MASSIVE_API_KEY"):
+            try:
+                self.adapters["massive"] = MassiveAdapter()
+                logger.info("✓ Massive adapter initialized (primary for indices)")
+            except Exception as e:
+                logger.warning("✗ Failed to initialize Massive: %s", e)
+
+        # iTick (Alternative for indices - unlimited free tier)
         if os.environ.get("ITICK_API_KEY"):
             try:
                 self.adapters["itick"] = ITickAdapter()
@@ -89,12 +100,15 @@ class ForexDataProvider:
             return self._get_from_source(source, symbol, start_date, end_date, symbol_type)
         
         # Try each adapter in priority order
-        # For indices, use Dukascopy first (free unlimited), then iTick, then TwelveData
-        # For forex/commodities, prefer Dukascopy (free), then TwelveData and OANDA
+        # For indices, use Massive first (best coverage), then iTick, TwelveData
+        # For forex, prefer Dukascopy (free tick data), then Massive, TwelveData, OANDA
+        # For commodities, prefer Dukascopy (free tick data), then TwelveData (Massive I:XAU is not spot)
         if symbol_type == "index":
-            priority_order = ["dukascopy", "itick", "twelvedata", "oanda"]
-        else:
+            priority_order = ["massive", "itick", "dukascopy", "twelvedata", "oanda"]
+        elif symbol_type == "commodity":
             priority_order = ["dukascopy", "twelvedata", "itick", "oanda"]
+        else:
+            priority_order = ["dukascopy", "massive", "twelvedata", "itick", "oanda"]
         
         for adapter_name in priority_order:
             if adapter_name in self.adapters:
@@ -118,7 +132,10 @@ class ForexDataProvider:
         """Get prices from a specific source"""
         adapter = self.adapters[source]
         
-        if source == "itick":
+        if source == "massive":
+            return adapter.get_prices(symbol, start_date, end_date)
+
+        elif source == "itick":
             if symbol_type == "index":
                 return adapter.get_index_prices(symbol, start_date, end_date)
             # iTick is primarily for indices, fall through for other types
@@ -200,7 +217,7 @@ def get_forex_provider() -> ForexDataProvider:
     # reinitialize the provider so API keys are picked up correctly.
     if not _forex_provider.adapters and any(
         os.environ.get(key)
-        for key in ["ITICK_API_KEY", "TWELVEDATA_API_KEY", "OANDA_API_KEY", "DUKASCOPY_API_URL", "DUKASCOPY_API_KEY"]
+        for key in ["MASSIVE_API_KEY", "ITICK_API_KEY", "TWELVEDATA_API_KEY", "OANDA_API_KEY", "DUKASCOPY_API_URL", "DUKASCOPY_API_KEY"]
     ):
         _forex_provider = ForexDataProvider()
     return _forex_provider
