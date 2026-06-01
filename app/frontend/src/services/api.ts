@@ -94,6 +94,12 @@ export const api = {
       params.tickers = (params.tickers as unknown as string).split(',').map(t => t.trim());
     }
 
+    // Normalize and validate tickers: remove separators and uppercase
+    const normalize = (t: string) => t.toUpperCase().replace(/[_\s\/]+/g, '');
+    if (Array.isArray(params.tickers)) {
+      params.tickers = params.tickers.map((t: string) => normalize(t)).filter(Boolean);
+    }
+
     // Helper function to get agent IDs from graph structure
     const getAgentIds = () => params.graph_nodes.map(node => node.id);
 

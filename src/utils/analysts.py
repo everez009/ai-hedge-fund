@@ -7,12 +7,14 @@ from src.agents.bill_ackman import bill_ackman_agent
 from src.agents.cathie_wood import cathie_wood_agent
 from src.agents.charlie_munger import charlie_munger_agent
 from src.agents.fundamentals import fundamentals_analyst_agent
+from src.agents.george_soros import george_soros_agent
 from src.agents.michael_burry import michael_burry_agent
 from src.agents.phil_fisher import phil_fisher_agent
 from src.agents.peter_lynch import peter_lynch_agent
 from src.agents.sentiment import sentiment_analyst_agent
 from src.agents.stanley_druckenmiller import stanley_druckenmiller_agent
 from src.agents.technicals import technical_analyst_agent
+from src.agents.currency_analyst import currency_pair_analyst_agent
 from src.agents.valuation import valuation_analyst_agent
 from src.agents.warren_buffett import warren_buffett_agent
 from src.agents.rakesh_jhunjhunwala import rakesh_jhunjhunwala_agent
@@ -22,6 +24,7 @@ from src.agents.nancy_pelosi import nancy_pelosi_agent
 from src.agents.news_sentiment import news_sentiment_agent
 from src.agents.growth_agent import growth_analyst_agent
 from src.agents.crypto_analyst import crypto_analyst_agent
+from src.agents.short_term_analysts import daytrader_analyst_agent, scalper_analyst_agent
 
 # Define analyst configuration - single source of truth
 ANALYST_CONFIG = {
@@ -129,13 +132,29 @@ ANALYST_CONFIG = {
         "type": "analyst",
         "order": 12,
     },
+    "george_soros": {
+        "display_name": "George Soros",
+        "description": "The Reflexive Global Macro Trader",
+        "investing_style": "Focuses on currency pair dislocations, reflexive macro trends, and gold as a strategic hedge against systemic risk, inflation, and policy uncertainty.",
+        "agent_func": george_soros_agent,
+        "type": "analyst",
+        "order": 13,
+    },
+    "currency_pair_analyst": {
+        "display_name": "Currency Pair Analyst",
+        "description": "FX and currency pair specialist",
+        "investing_style": "Focuses on Forex trend structure, momentum, range pressure, and currency-pair-specific volatility for major FX pairs.",
+        "agent_func": currency_pair_analyst_agent,
+        "type": "analyst",
+        "order": 14,
+    },
     "warren_buffett": {
         "display_name": "Warren Buffett",
         "description": "The Oracle of Omaha",
         "investing_style": "Seeks companies with strong fundamentals and competitive advantages through value investing and long-term ownership.",
         "agent_func": warren_buffett_agent,
         "type": "analyst",
-        "order": 13,
+        "order": 14,
     },
     "technical_analyst": {
         "display_name": "Technical Analyst",
@@ -143,7 +162,23 @@ ANALYST_CONFIG = {
         "investing_style": "Focuses on chart patterns and market trends to make investment decisions, often using technical indicators and price action analysis.",
         "agent_func": technical_analyst_agent,
         "type": "analyst",
-        "order": 14,
+        "order": 15,
+    },
+    "scalper_analyst": {
+        "display_name": "Scalper Analyst",
+        "description": "Short-term price action specialist for FX, commodities, indices, and crypto.",
+        "investing_style": "Focuses on rapid swings, tight risk control, and high-frequency setups using fast trend and momentum signals.",
+        "agent_func": scalper_analyst_agent,
+        "type": "analyst",
+        "order": 22,
+    },
+    "daytrader_analyst": {
+        "display_name": "Daytrader Analyst",
+        "description": "Intraday/short-term trend analyst for FX, commodities, indices, and crypto.",
+        "investing_style": "Balances momentum, trend strength, and intraday risk management for short-term directional trades.",
+        "agent_func": daytrader_analyst_agent,
+        "type": "analyst",
+        "order": 23,
     },
     "fundamentals_analyst": {
         "display_name": "Fundamentals Analyst",
@@ -151,7 +186,7 @@ ANALYST_CONFIG = {
         "investing_style": "Delves into financial statements and economic indicators to assess the intrinsic value of companies through fundamental analysis.",
         "agent_func": fundamentals_analyst_agent,
         "type": "analyst",
-        "order": 15,
+        "order": 16,
     },
     "growth_analyst": {
         "display_name": "Growth Analyst",
@@ -159,7 +194,7 @@ ANALYST_CONFIG = {
         "investing_style": "Analyzes growth trends and valuation to identify growth opportunities through growth analysis.",
         "agent_func": growth_analyst_agent,
         "type": "analyst",
-        "order": 16,
+        "order": 17,
     },
     "news_sentiment_analyst": {
         "display_name": "News Sentiment Analyst",
@@ -167,7 +202,7 @@ ANALYST_CONFIG = {
         "investing_style": "Analyzes news sentiment to predict market movements and identify opportunities through news analysis.",
         "agent_func": news_sentiment_agent,
         "type": "analyst",
-        "order": 17,
+        "order": 18,
     },
     "sentiment_analyst": {
         "display_name": "Sentiment Analyst",
@@ -175,7 +210,7 @@ ANALYST_CONFIG = {
         "investing_style": "Gauges market sentiment and investor behavior to predict market movements and identify opportunities through behavioral analysis.",
         "agent_func": sentiment_analyst_agent,
         "type": "analyst",
-        "order": 18,
+        "order": 19,
     },
     "valuation_analyst": {
         "display_name": "Valuation Analyst",
@@ -183,7 +218,7 @@ ANALYST_CONFIG = {
         "investing_style": "Specializes in determining the fair value of companies, using various valuation models and financial metrics for investment decisions.",
         "agent_func": valuation_analyst_agent,
         "type": "analyst",
-        "order": 19,
+        "order": 20,
     },
     "crypto_analyst": {
         "display_name": "Crypto Analyst",
@@ -191,7 +226,7 @@ ANALYST_CONFIG = {
         "investing_style": "Specializes in cryptocurrency analysis using on-chain metrics, network fundamentals, and crypto-specific indicators for Bitcoin, Ethereum, and altcoins.",
         "agent_func": crypto_analyst_agent,
         "type": "analyst",
-        "order": 20,
+        "order": 21,
     },
 }
 
@@ -206,13 +241,4 @@ def get_analyst_nodes():
 
 def get_agents_list():
     """Get the list of agents for API responses."""
-    return [
-        {
-            "key": key,
-            "display_name": config["display_name"],
-            "description": config["description"],
-            "investing_style": config["investing_style"],
-            "order": config["order"]
-        }
-        for key, config in sorted(ANALYST_CONFIG.items(), key=lambda x: x[1]["order"])
-    ]
+    return [{"key": key, "display_name": config["display_name"], "description": config["description"], "investing_style": config["investing_style"], "order": config["order"]} for key, config in sorted(ANALYST_CONFIG.items(), key=lambda x: x[1]["order"])]

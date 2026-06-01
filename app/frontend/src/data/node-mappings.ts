@@ -77,6 +77,18 @@ const baseNodeTypeDefinitions: Record<string, NodeTypeDefinition> = {
       },
     }),
   },
+  "FX Input": {
+    createNode: (position: { x: number, y: number }): AppNode => ({
+      id: `fx-analyzer-node_${generateUniqueIdSuffix()}`,
+      type: "fx-analyzer-node",
+      position,
+      data: {
+        name: "FX Input",
+        description: "Enter currency pairs, indices, or XAUUSD and connect this node to Analysts.",
+        status: "Idle",
+      },
+    }),
+  },
 };
 
 /**

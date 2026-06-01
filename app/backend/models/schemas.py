@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import re
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Dict, Any
 from src.llm.models import ModelProvider
@@ -68,6 +69,35 @@ class BaseHedgeFundRequest(BaseModel):
     margin_requirement: float = 0.0
     portfolio_positions: Optional[List[PortfolioPosition]] = None
     api_keys: Optional[Dict[str, str]] = None
+
+    @field_validator('tickers', mode='before')
+    @classmethod
+    def normalize_tickers(cls, tickers: Any) -> List[str]:
+        if isinstance(tickers, str):
+            tickers = [tickers]
+        if not isinstance(tickers, list):
+            raise ValueError('tickers must be a list of strings')
+
+        normalized_tickers: list[str] = []
+        for ticker in tickers:
+            if not isinstance(ticker, str):
+                raise ValueError('Each ticker must be a string')
+            cleaned = re.sub(r'[_\s/]+', '', ticker).upper()
+            if cleaned:
+                normalized_tickers.append(cleaned)
+
+        if not normalized_tickers:
+            raise ValueError('At least one ticker is required')
+
+        return normalized_tickers
+
+    @field_validator('tickers')
+    @classmethod
+    def validate_tickers(cls, tickers: List[str]) -> List[str]:
+        for ticker in tickers:
+            if not re.fullmatch(r'[A-Z0-9]{3,12}', ticker):
+                raise ValueError(f'Invalid ticker format: {ticker}')
+        return tickers
 
     def get_agent_ids(self) -> List[str]:
         """Extract agent IDs from graph structure"""

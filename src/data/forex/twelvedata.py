@@ -10,6 +10,12 @@ from typing import List, Optional
 from src.data.models import Price
 
 
+def _requests_session() -> requests.Session:
+    session = requests.Session()
+    session.trust_env = False
+    return session
+
+
 class TwelveDataAdapter:
     """Adapter for Twelve Data API"""
     
@@ -45,7 +51,8 @@ class TwelveDataAdapter:
             "apikey": self.api_key
         }
         
-        response = requests.get(f"{self.base_url}/time_series", params=params)
+        session = _requests_session()
+        response = session.get(f"{self.base_url}/time_series", params=params, timeout=15)
         if response.status_code != 200:
             print(f"Error fetching data from Twelve Data: {response.status_code}")
             print(response.text)
@@ -94,10 +101,9 @@ class TwelveDataAdapter:
         if symbol.startswith("XAG"):
             return "XAG/USD"
         
-        # Indices - TwelveData doesn't support indices on free tier
-        # These will fall through to Alpha Vantage which uses ETF symbols
+        # Indices - TwelveData doesn't support these on the free tier
         if symbol in ["SPX", "NAS100", "US30", "GER30", "FTSE", "NIKKEI"]:
-            return symbol  # Let Alpha Vantage handle these
+            return symbol
         
         return symbol
     
@@ -110,7 +116,8 @@ class TwelveDataAdapter:
             "apikey": self.api_key
         }
         
-        response = requests.get(f"{self.base_url}/price", params=params)
+        session = _requests_session()
+        response = session.get(f"{self.base_url}/price", params=params, timeout=15)
         if response.status_code != 200:
             return None
         
@@ -143,7 +150,8 @@ class TwelveDataAdapter:
             **kwargs
         }
         
-        response = requests.get(f"{self.base_url}/{indicator.lower()}", params=params)
+        session = _requests_session()
+        response = session.get(f"{self.base_url}/{indicator.lower()}", params=params, timeout=15)
         if response.status_code != 200:
             print(f"Error fetching {indicator}: {response.status_code}")
             return {}

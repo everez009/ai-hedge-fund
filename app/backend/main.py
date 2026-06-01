@@ -1,3 +1,10 @@
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from the repository root .env so API keys are available to data providers
+root_path = Path(__file__).resolve().parents[2]
+load_dotenv(root_path / ".env")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging

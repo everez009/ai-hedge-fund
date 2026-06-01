@@ -10,6 +10,12 @@ from typing import List, Dict, Optional
 from src.data.models import Price
 
 
+def _requests_session() -> requests.Session:
+    session = requests.Session()
+    session.trust_env = False
+    return session
+
+
 class AlphaVantageAdapter:
     """Adapter for Alpha Vantage API to fetch forex, indices, and commodities data"""
     
@@ -56,7 +62,8 @@ class AlphaVantageAdapter:
             "apikey": self.api_key
         }
         
-        response = requests.get(self.base_url, params=params)
+        session = _requests_session()
+        response = session.get(self.base_url, params=params, timeout=15)
         if response.status_code != 200:
             print(f"Error fetching forex data: {response.status_code}")
             return []
@@ -106,7 +113,8 @@ class AlphaVantageAdapter:
             "apikey": self.api_key
         }
         
-        response = requests.get(self.base_url, params=params)
+        session = _requests_session()
+        response = session.get(self.base_url, params=params, timeout=15)
         if response.status_code != 200:
             print(f"Error fetching intraday forex data: {response.status_code}")
             return []
@@ -192,7 +200,8 @@ class AlphaVantageAdapter:
             "apikey": self.api_key
         }
         
-        response = requests.get(self.base_url, params=params)
+        session = _requests_session()
+        response = session.get(self.base_url, params=params, timeout=15)
         if response.status_code != 200:
             print(f"Error fetching data for {symbol}: {response.status_code}")
             return []
@@ -267,7 +276,8 @@ class AlphaVantageAdapter:
             "apikey": self.api_key
         }
         
-        response = requests.get(self.base_url, params=params)
+        session = _requests_session()
+        response = session.get(self.base_url, params=params, timeout=15)
         if response.status_code != 200:
             return None
         

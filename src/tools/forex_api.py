@@ -2,11 +2,15 @@
 Unified Forex, Indices, and Commodities API Provider
 Integrates multiple data sources for comprehensive market coverage
 """
+import logging
 import os
 from typing import List, Optional
 from src.data.models import Price
-from src.data.forex import AlphaVantageAdapter, TwelveDataAdapter, OandaAdapter
+from src.data.forex import TwelveDataAdapter, OandaAdapter
 from src.data.forex.itick import ITickAdapter
+from src.data.forex.dukascopy import DukascopyAdapter
+
+logger = logging.getLogger(__name__)
 
 
 class ForexDataProvider:
@@ -21,40 +25,47 @@ class ForexDataProvider:
         
     def _initialize_adapters(self):
         """Initialize available data adapters based on API keys"""
+        logger.info(
+            "Initializing ForexDataProvider adapters: itick=%s, twelvedata=%s, oanda=%s",
+            bool(os.environ.get("ITICK_API_KEY")),
+            bool(os.environ.get("TWELVEDATA_API_KEY")),
+            bool(os.environ.get("OANDA_API_KEY")),
+        )
+
         # iTick (Best for indices - unlimited free tier)
         if os.environ.get("ITICK_API_KEY"):
             try:
                 self.adapters["itick"] = ITickAdapter()
-                print("✓ iTick adapter initialized (primary for indices)")
+                logger.info("✓ iTick adapter initialized (primary for indices)")
             except Exception as e:
-                print(f"✗ Failed to initialize iTick: {e}")
-        
-        # Alpha Vantage
-        if os.environ.get("ALPHAVANTAGE_API_KEY"):
+                logger.warning("✗ Failed to initialize iTick: %s", e)
+
+        # Dukascopy (free tick data — no API key required, just the URL or key set)
+        if os.environ.get("DUKASCOPY_API_URL") or os.environ.get("DUKASCOPY_API_KEY"):
             try:
-                self.adapters["alphavantage"] = AlphaVantageAdapter()
-                print("✓ Alpha Vantage adapter initialized")
+                self.adapters["dukascopy"] = DukascopyAdapter()
+                logger.info("✓ Dukascopy adapter initialized (free tick data)")
             except Exception as e:
-                print(f"✗ Failed to initialize Alpha Vantage: {e}")
-        
+                logger.warning("✗ Failed to initialize Dukascopy: %s", e)
+
         # Twelve Data
         if os.environ.get("TWELVEDATA_API_KEY"):
             try:
                 self.adapters["twelvedata"] = TwelveDataAdapter()
-                print("✓ Twelve Data adapter initialized")
+                logger.info("✓ Twelve Data adapter initialized")
             except Exception as e:
-                print(f"✗ Failed to initialize Twelve Data: {e}")
-        
+                logger.warning("✗ Failed to initialize Twelve Data: %s", e)
+
         # OANDA
         if os.environ.get("OANDA_API_KEY"):
             try:
                 self.adapters["oanda"] = OandaAdapter()
-                print("✓ OANDA adapter initialized")
+                logger.info("✓ OANDA adapter initialized")
             except Exception as e:
-                print(f"✗ Failed to initialize OANDA: {e}")
-        
+                logger.warning("✗ Failed to initialize OANDA: %s", e)
+
         if not self.adapters:
-            print("⚠ Warning: No forex data adapters initialized. Please set at least one API key.")
+            logger.warning("⚠ Warning: No forex data adapters initialized. Please set at least one API key.")
     
     def get_prices(self, symbol: str, start_date: str, end_date: str, 
                    source: str = None) -> List[Price]:
@@ -65,7 +76,7 @@ class ForexDataProvider:
             symbol: Trading symbol (e.g., 'EURUSD', 'XAUUSD', 'SPX')
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format
-            source: Specific source to use ('alphavantage', 'twelvedata', 'oanda') or None for auto
+            source: Specific source to use ('twelvedata', 'oanda') or None for auto
             
         Returns:
             List of Price objects
@@ -78,24 +89,28 @@ class ForexDataProvider:
             return self._get_from_source(source, symbol, start_date, end_date, symbol_type)
         
         # Try each adapter in priority order
-        # For indices, use iTick first (best free tier), then Alpha Vantage
+        # For indices, use Dukascopy first (free unlimited), then iTick, then TwelveData
+        # For forex/commodities, prefer Dukascopy (free), then TwelveData and OANDA
         if symbol_type == "index":
-            priority_order = ["itick", "alphavantage", "twelvedata", "oanda"]
+            priority_order = ["dukascopy", "itick", "twelvedata", "oanda"]
         else:
-            priority_order = ["twelvedata", "alphavantage", "oanda"]
+            priority_order = ["dukascopy", "twelvedata", "itick", "oanda"]
         
         for adapter_name in priority_order:
             if adapter_name in self.adapters:
                 try:
                     prices = self._get_from_source(adapter_name, symbol, start_date, end_date, symbol_type)
                     if prices:
-                        print(f"✓ Successfully fetched {len(prices)} prices for {symbol} from {adapter_name}")
+                        logger.info(
+                            "✓ Successfully fetched %s prices for %s from %s",
+                            len(prices), symbol, adapter_name,
+                        )
                         return prices
                 except Exception as e:
-                    print(f"✗ Error with {adapter_name}: {e}")
+                    logger.warning("✗ Error with %s: %s", adapter_name, e)
                     continue
         
-        print(f"⚠ No data found for {symbol}")
+        logger.warning("⚠ No data found for %s", symbol)
         return []
     
     def _get_from_source(self, source: str, symbol: str, start_date: str, 
@@ -108,16 +123,9 @@ class ForexDataProvider:
                 return adapter.get_index_prices(symbol, start_date, end_date)
             # iTick is primarily for indices, fall through for other types
         
-        elif source == "alphavantage":
-            if symbol_type == "forex":
-                from_curr = symbol[:3]
-                to_curr = symbol[3:]
-                return adapter.get_forex_prices(from_curr, to_curr, start_date, end_date)
-            elif symbol_type == "commodity":
-                return adapter.get_commodity_prices(symbol, start_date, end_date)
-            elif symbol_type == "index":
-                return adapter.get_index_prices(symbol, start_date, end_date)
-        
+        elif source == "dukascopy":
+            return adapter.get_prices(symbol, start_date, end_date)
+
         elif source == "twelvedata":
             return adapter.get_prices(symbol, start_date, end_date)
         
@@ -142,7 +150,7 @@ class ForexDataProvider:
             return "commodity"
         
         # Indices
-        if symbol in ["SPX", "IXIC", "DJI", "VIX", "RUT"]:
+        if symbol in ["SPX", "IXIC", "DJI", "VIX", "RUT", "FTSE", "NIKKEI", "DAX"]:
             return "index"
         if symbol.startswith("NAS") or symbol.startswith("US30") or symbol.startswith("GER"):
             return "index"
@@ -185,5 +193,14 @@ def get_forex_provider() -> ForexDataProvider:
     """Get or create the global forex data provider instance"""
     global _forex_provider
     if _forex_provider is None:
+        _forex_provider = ForexDataProvider()
+        return _forex_provider
+
+    # If environment variables were loaded after the provider was first created,
+    # reinitialize the provider so API keys are picked up correctly.
+    if not _forex_provider.adapters and any(
+        os.environ.get(key)
+        for key in ["ITICK_API_KEY", "TWELVEDATA_API_KEY", "OANDA_API_KEY", "DUKASCOPY_API_URL", "DUKASCOPY_API_KEY"]
+    ):
         _forex_provider = ForexDataProvider()
     return _forex_provider

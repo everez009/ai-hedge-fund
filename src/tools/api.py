@@ -4,6 +4,7 @@ import os
 import pandas as pd
 import requests
 import time
+from requests.exceptions import RequestException
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,16 @@ from src.data.models import (
     InsiderTradeResponse,
     CompanyFactsResponse,
 )
+from src.tools.forex_api import get_forex_provider
 
 # Global cache instance
 _cache = get_cache()
+
+
+def _requests_session() -> requests.Session:
+    session = requests.Session()
+    session.trust_env = False
+    return session
 
 
 def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: dict = None, max_retries: int = 3) -> requests.Response:
@@ -43,16 +51,30 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
     Raises:
         Exception: If the request fails with a non-429 error
     """
+    session = _requests_session()
+
     for attempt in range(max_retries + 1):  # +1 for initial attempt
-        if method.upper() == "POST":
-            response = requests.post(url, headers=headers, json=json_data)
-        else:
-            response = requests.get(url, headers=headers)
+        try:
+            if method.upper() == "POST":
+                response = session.post(url, headers=headers, json=json_data, timeout=30)
+            else:
+                response = session.get(url, headers=headers, timeout=30)
+        except RequestException as exc:
+            logger.warning("API request failed for %s %s: %s", method, url, exc)
+            response = requests.Response()
+            response.status_code = 500
+            response._content = b"{}"
+            return response
         
         if response.status_code == 429 and attempt < max_retries:
             # Linear backoff: 60s, 90s, 120s, 150s...
             delay = 60 + (30 * attempt)
-            print(f"Rate limited (429). Attempt {attempt + 1}/{max_retries + 1}. Waiting {delay}s before retrying...")
+            logger.warning(
+                "Rate limited (429). Attempt %s/%s while requesting %s.",
+                attempt + 1,
+                max_retries + 1,
+                url,
+            )
             time.sleep(delay)
             continue
         
@@ -84,8 +106,7 @@ def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None)
     # For forex/commodities/indices, use forex API adapters
     if is_forex_type:
         try:
-            from src.tools.forex_api import ForexDataProvider
-            forex_provider = ForexDataProvider()
+            forex_provider = get_forex_provider()
             forex_prices = forex_provider.get_prices(ticker, start_date, end_date)
             
             if forex_prices:
@@ -105,6 +126,11 @@ def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None)
                 # Cache the results
                 _cache.set_prices(cache_key, [p.model_dump() for p in prices])
                 return prices
+            logger.warning(
+                "Forex provider returned no data for %s using sources: %s",
+                ticker,
+                forex_provider.get_available_sources(),
+            )
         except Exception as e:
             logger.warning(f"Forex API failed for {ticker}: {e}")
             # Fall through to stock API as fallback

@@ -13,6 +13,12 @@ from datetime import datetime, timedelta
 from src.data.models import Price
 
 
+def _requests_session() -> requests.Session:
+    session = requests.Session()
+    session.trust_env = False
+    return session
+
+
 class ITickAdapter:
     """Adapter for iTick API - Best free tier for global indices"""
     
@@ -89,7 +95,8 @@ class ITickAdapter:
             "token": self.api_key
         }
         
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+        session = _requests_session()
+        response = session.get(url, params=params, headers=headers, timeout=15)
         
         if response.status_code != 200:
             print(f"iTick API error: HTTP {response.status_code}")
@@ -167,7 +174,8 @@ class ITickAdapter:
                 "token": self.api_key
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            session = _requests_session()
+            response = session.get(url, params=params, headers=headers, timeout=15)
             
             if response.status_code == 200:
                 data = response.json()

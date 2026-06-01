@@ -9,6 +9,12 @@ from datetime import datetime
 from src.data.models import Price
 
 
+def _requests_session() -> requests.Session:
+    session = requests.Session()
+    session.trust_env = False
+    return session
+
+
 class OandaAdapter:
     """Adapter for OANDA REST API v20"""
     
@@ -57,7 +63,8 @@ class OandaAdapter:
         }
         
         url = f"{self.base_url}/v3/instruments/{normalized_instrument}/candles"
-        response = requests.get(url, headers=self.headers, params=params)
+        session = _requests_session()
+        response = session.get(url, headers=self.headers, params=params, timeout=15)
         
         if response.status_code != 200:
             print(f"Error fetching OANDA data: {response.status_code}")
@@ -112,7 +119,8 @@ class OandaAdapter:
         
         params = {"instruments": normalized_instrument}
         url = f"{self.base_url}/v3/pricing"
-        response = requests.get(url, headers=self.headers, params=params)
+        session = _requests_session()
+        response = session.get(url, headers=self.headers, params=params, timeout=15)
         
         if response.status_code != 200:
             return None
@@ -134,7 +142,8 @@ class OandaAdapter:
     def get_account_summary(self) -> Optional[Dict]:
         """Get account summary information"""
         url = f"{self.base_url}/v3/accounts/{self.account_id}/summary"
-        response = requests.get(url, headers=self.headers)
+        session = _requests_session()
+        response = session.get(url, headers=self.headers, timeout=15)
         
         if response.status_code != 200:
             print(f"Error fetching account summary: {response.status_code}")
@@ -181,7 +190,8 @@ class OandaAdapter:
             }
         
         url = f"{self.base_url}/v3/accounts/{self.account_id}/orders"
-        response = requests.post(url, headers=self.headers, json=order_data)
+        session = _requests_session()
+        response = session.post(url, headers=self.headers, json=order_data, timeout=15)
         
         if response.status_code != 201:
             print(f"Error placing order: {response.status_code}")
@@ -193,7 +203,8 @@ class OandaAdapter:
     def get_open_positions(self) -> List[Dict]:
         """Get all open positions"""
         url = f"{self.base_url}/v3/accounts/{self.account_id}/openPositions"
-        response = requests.get(url, headers=self.headers)
+        session = _requests_session()
+        response = session.get(url, headers=self.headers, timeout=15)
         
         if response.status_code != 200:
             return []
@@ -206,7 +217,8 @@ class OandaAdapter:
         normalized_instrument = self._normalize_instrument(instrument)
         
         url = f"{self.base_url}/v3/accounts/{self.account_id}/positions/{normalized_instrument}/close"
-        response = requests.put(url, headers=self.headers)
+        session = _requests_session()
+        response = session.put(url, headers=self.headers, timeout=15)
         
         if response.status_code != 200:
             print(f"Error closing position: {response.status_code}")

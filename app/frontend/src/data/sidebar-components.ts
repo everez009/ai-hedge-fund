@@ -39,6 +39,7 @@ export const getComponentGroups = async (): Promise<ComponentGroup[]> => {
       items: [
         { name: "Portfolio Input", icon: ChartPie },
         { name: "Stock Input", icon: ChartLine },
+        { name: "FX Input", icon: ChartLine },
       ]
     },
     {
