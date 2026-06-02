@@ -82,10 +82,11 @@ def _make_api_request(url: str, headers: dict, method: str = "GET", json_data: d
         return response
 
 
-def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None) -> list[Price]:
+def get_prices(ticker: str, start_date: str, end_date: str, 
+               api_key: str = None, interval: str = "1day") -> list[Price]:
     """Fetch price data from cache or API (supports stocks, forex, commodities, indices)."""
     # Create a cache key that includes all parameters to ensure exact matches
-    cache_key = f"{ticker}_{start_date}_{end_date}"
+    cache_key = f"{ticker}_{start_date}_{end_date}_{interval}"
     
     # Check cache first - simple exact match
     if cached_data := _cache.get_prices(cache_key):
@@ -107,7 +108,7 @@ def get_prices(ticker: str, start_date: str, end_date: str, api_key: str = None)
     if is_forex_type:
         try:
             forex_provider = get_forex_provider()
-            forex_prices = forex_provider.get_prices(ticker, start_date, end_date)
+            forex_prices = forex_provider.get_prices(ticker, start_date, end_date, interval=interval)
             
             if forex_prices:
                 # Convert forex Price objects to the format expected by the system

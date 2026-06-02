@@ -33,7 +33,7 @@ def scalper_analyst_agent(state: AgentState, agent_id: str = "scalper_analyst_ag
 
     for ticker in tickers:
         progress.update_status(agent_id, ticker, "Fetching scalper price data")
-        prices = get_prices(ticker=ticker, start_date=start_date, end_date=end_date, api_key=api_key)
+        prices = get_prices(ticker=ticker, start_date=start_date, end_date=end_date, api_key=api_key, interval="5min")
 
         if not prices:
             progress.update_status(agent_id, ticker, "Failed: No price data found")
@@ -84,7 +84,7 @@ def daytrader_analyst_agent(state: AgentState, agent_id: str = "daytrader_analys
 
     for ticker in tickers:
         progress.update_status(agent_id, ticker, "Fetching daytrader price data")
-        prices = get_prices(ticker=ticker, start_date=start_date, end_date=end_date, api_key=api_key)
+        prices = get_prices(ticker=ticker, start_date=start_date, end_date=end_date, api_key=api_key, interval="15min")
 
         if not prices:
             progress.update_status(agent_id, ticker, "Failed: No price data found")

@@ -187,6 +187,40 @@ def _resample_to_daily(ticks: list, symbol: str) -> List[Price]:
     return prices
 
 
+def _resample_to_5min(ticks: list, symbol: str) -> List[Price]:
+    """
+    Resample a list of tick dicts to 5-minute OHLCV candles.
+
+    Each tick dict: {'time': datetime, 'mid': float, 'volume': int}
+    """
+    by_slot: dict[str, list] = defaultdict(list)
+    for t in ticks:
+        # Round down to nearest 5-min boundary
+        minute = (t["time"].minute // 5) * 5
+        slot_key = t["time"].replace(minute=minute, second=0, microsecond=0)
+        by_slot[slot_key].append(t)
+
+    prices = []
+    for slot_key in sorted(by_slot):
+        slot_ticks = by_slot[slot_key]
+        mids = [t["mid"] for t in slot_ticks if t["mid"] > 0]
+        if not mids:
+            continue
+
+        price = Price(
+            ticker=symbol,
+            time=slot_key.strftime("%Y-%m-%d %H:%M:%S"),
+            open=round(mids[0], 6),
+            high=round(max(mids), 6),
+            low=round(min(mids), 6),
+            close=round(mids[-1], 6),
+            volume=sum(t["volume"] for t in slot_ticks),
+        )
+        prices.append(price)
+
+    return prices
+
+
 class DukascopyAdapter:
     """
     Adapter for Dukascopy free tick data feed.
@@ -221,13 +255,13 @@ class DukascopyAdapter:
         interval: str = "1day",
     ) -> List[Price]:
         """
-        Fetch daily OHLCV candles for *symbol* between *start_date* and *end_date*.
+        Fetch OHLCV candles for *symbol* between *start_date* and *end_date*.
 
         Args:
             symbol: e.g. 'EURUSD', 'XAUUSD', 'US30'
             start_date: 'YYYY-MM-DD'
             end_date:   'YYYY-MM-DD'
-            interval:   Only '1day' is currently supported.
+            interval:   '1day' (default) or '5min'.
 
         Returns:
             List[Price] sorted by time ascending.
@@ -242,7 +276,12 @@ class DukascopyAdapter:
             return []
 
         # Cap range to avoid excessively long downloads
-        max_days = 180
+        if interval == "5min":
+            # 5-min data over many days = huge volume of ticks. Cap to 5 days.
+            max_days = 5
+        else:
+            max_days = 180
+
         if (end_dt - start_dt).days > max_days:
             logger.info("Dukascopy: capping date range to %d days (was %d)",
                         max_days, (end_dt - start_dt).days)
@@ -268,10 +307,15 @@ class DukascopyAdapter:
                            norm, start_date, end_date)
             return []
 
-        # Resample to daily candles
-        candles = _resample_to_daily(all_ticks, symbol)
-        logger.info("Dukascopy: %d daily candles for %s (%d ticks total)",
-                    len(candles), norm, len(all_ticks))
+        # Resample to requested interval
+        if interval == "5min":
+            candles = _resample_to_5min(all_ticks, symbol)
+            logger.info("Dukascopy: %d 5-min candles for %s (%d ticks total)",
+                        len(candles), norm, len(all_ticks))
+        else:
+            candles = _resample_to_daily(all_ticks, symbol)
+            logger.info("Dukascopy: %d daily candles for %s (%d ticks total)",
+                        len(candles), norm, len(all_ticks))
         return candles
 
     def get_current_price(self, symbol: str) -> Optional[float]:

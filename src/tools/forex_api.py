@@ -79,7 +79,7 @@ class ForexDataProvider:
             logger.warning("⚠ Warning: No forex data adapters initialized. Please set at least one API key.")
     
     def get_prices(self, symbol: str, start_date: str, end_date: str, 
-                   source: str = None) -> List[Price]:
+                   source: str = None, interval: str = "1day") -> List[Price]:
         """
         Get price data from the best available source
         
@@ -88,6 +88,7 @@ class ForexDataProvider:
             start_date: Start date in YYYY-MM-DD format
             end_date: End date in YYYY-MM-DD format
             source: Specific source to use ('twelvedata', 'oanda') or None for auto
+            interval: Time interval ('1day' default, '5min', '1hour', etc.)
             
         Returns:
             List of Price objects
@@ -113,7 +114,7 @@ class ForexDataProvider:
         for adapter_name in priority_order:
             if adapter_name in self.adapters:
                 try:
-                    prices = self._get_from_source(adapter_name, symbol, start_date, end_date, symbol_type)
+                    prices = self._get_from_source(adapter_name, symbol, start_date, end_date, symbol_type, interval)
                     if prices:
                         logger.info(
                             "✓ Successfully fetched %s prices for %s from %s",
@@ -128,12 +129,12 @@ class ForexDataProvider:
         return []
     
     def _get_from_source(self, source: str, symbol: str, start_date: str, 
-                         end_date: str, symbol_type: str) -> List[Price]:
+                         end_date: str, symbol_type: str, interval: str = "1day") -> List[Price]:
         """Get prices from a specific source"""
         adapter = self.adapters[source]
         
         if source == "massive":
-            return adapter.get_prices(symbol, start_date, end_date)
+            return adapter.get_prices(symbol, start_date, end_date, interval=interval)
 
         elif source == "itick":
             if symbol_type == "index":
@@ -141,10 +142,10 @@ class ForexDataProvider:
             # iTick is primarily for indices, fall through for other types
         
         elif source == "dukascopy":
-            return adapter.get_prices(symbol, start_date, end_date)
+            return adapter.get_prices(symbol, start_date, end_date, interval=interval)
 
         elif source == "twelvedata":
-            return adapter.get_prices(symbol, start_date, end_date)
+            return adapter.get_prices(symbol, start_date, end_date, interval=interval)
         
         elif source == "oanda":
             return adapter.get_prices(symbol, start_date, end_date)

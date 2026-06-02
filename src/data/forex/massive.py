@@ -187,10 +187,15 @@ class MassiveAdapter:
                 timestamp_ms = bar.get("t", 0)
                 if not timestamp_ms:
                     continue
-                date_str = datetime.utcfromtimestamp(timestamp_ms / 1000).strftime("%Y-%m-%d")
+                # Include time component for intraday bars (5min, 1hour, etc.)
+                dt = datetime.utcfromtimestamp(timestamp_ms / 1000)
+                if timespan in ("minute", "hour"):
+                    time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    time_str = dt.strftime("%Y-%m-%d")
                 price = Price(
                     ticker=symbol,
-                    time=date_str,
+                    time=time_str,
                     open=float(bar["o"]),
                     high=float(bar["h"]),
                     low=float(bar["l"]),
@@ -202,8 +207,8 @@ class MassiveAdapter:
                 continue
 
         logger.info(
-            "Massive: %d daily candles for %s (%s)",
-            len(prices), symbol, massive_ticker,
+            "Massive: %d %s candles for %s (%s)",
+            len(prices), f"{timespan}" if timespan in ("minute", "hour") else "daily", symbol, massive_ticker,
         )
         return prices
 
