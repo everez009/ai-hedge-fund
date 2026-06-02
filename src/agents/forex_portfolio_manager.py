@@ -5,12 +5,10 @@ Generates entry, TP, and SL signals instead of share-based trading
 """
 import json
 from langchain_core.messages import HumanMessage
-from langchain_core.prompts import ChatPromptTemplate
 
 from src.graph.state import AgentState, show_agent_reasoning
 from pydantic import BaseModel, Field
 from src.utils.progress import progress
-from src.utils.llm import call_llm
 
 
 class TradeSignal(BaseModel):
@@ -126,84 +124,82 @@ def generate_trade_signals(
     signal_summary = {}
     for ticker in tickers:
         analysis = ticker_analysis.get(ticker, {})
+        price = analysis.get("current_price", 0)
+        
+        # If no price, skip this ticker
+        if price == 0:
+            continue
+            
+        analysts = analysis.get("signals", {})
+        
+        # Calculate consensus
+        bullish_count = sum(1 for a in analysts.values() if a.get("signal") == "bullish")
+        bearish_count = sum(1 for a in analysts.values() if a.get("signal") == "bearish")
+        total = len(analysts)
+        
+        if total == 0:
+            consensus = "neutral"
+            avg_confidence = 50
+        else:
+            if bullish_count > bearish_count:
+                consensus = "bullish"
+                avg_confidence = int(sum(a.get("confidence", 50) for a in analysts.values()) / total)
+            elif bearish_count > bullish_count:
+                consensus = "bearish"
+                avg_confidence = int(sum(a.get("confidence", 50) for a in analysts.values()) / total)
+            else:
+                consensus = "neutral"
+                avg_confidence = 50
+        
         signal_summary[ticker] = {
-            "price": analysis.get("current_price", 0),
-            "analysts": analysis.get("signals", {}),
+            "price": price,
+            "consensus": consensus,
+            "avg_confidence": avg_confidence,
+            "analysts": analysts,
         }
 
-    template = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "You are an expert FX/indices/commodities trader specializing in 5-min timeframe scalping.\n"
-                "Analyze the aggregated analyst signals and current price to generate precise entry, TP, and SL levels.\n"
-                "IMPORTANT: You MUST generate actual trade signals (long/short) when analyst confidence is high (≥70%).\n"
-                "Do NOT default to 'wait' if there's clear directional bias from analysts.\n"
-                "For scalping on 5-min:\n"
-                "- Stop loss should be 1.5-3x ATR or recent swing high/low (10-30 pips for FX, 5-15 points for indices)\n"
-                "- Take profit should give minimum 1:1.5 risk/reward ratio\n"
-                "- Position size 0.5-3% of equity per trade\n"
-                "- Only use 'wait' if signals are truly conflicting (bullish and bearish cancel out)\n"
-                "Return JSON only with exact schema."
-            ),
-            (
-                "human",
-                "Current prices and analyst signals:\n{signals}\n\n"
-                "Account equity: ${equity:,.0f}\n\n"
-                "For each ticker, provide:\n"
-                "- direction: 'long', 'short', or 'wait'\n"
-                "- entry_price: current market price or limit entry\n"
-                "- stop_loss: price level for stop loss\n"
-                "- take_profit: price level for take profit\n"
-                "- confidence: 0-100 based on analyst consensus\n"
-                "- risk_reward_ratio: (TP-Entry)/(Entry-SL) for long, (Entry-TP)/(SL-Entry) for short\n"
-                "- reasoning: concise reasoning (max 150 chars)\n"
-                "- position_size_pct: 0.5-5.0% of equity\n\n"
-                "EXAMPLE:\n"
-                '{{\n'
-                '  "signals": {{\n'
-                '    "GBPJPY": {{"direction":"long","entry_price":198.452,"stop_loss":198.352,"take_profit":198.752,"confidence":85,"risk_reward_ratio":3.0,"reasoning":"Strong bullish consensus from scalper (95%) and daytrader (90%)","position_size_pct":2.0}}\n'
-                "  }}\n"
-                "}}\n\n"
-                "Now generate signals for the following:\n"
-                "Format:\n"
-                "{{\n"
-                '  "signals": {{\n'
-                '    "TICKER": {{"direction":"long/short/wait","entry_price":float,"stop_loss":float,"take_profit":float,"confidence":int,"risk_reward_ratio":float,"reasoning":"...","position_size_pct":float}}\n'
-                "  }}\n"
-                "}}"
-            ),
-        ]
-    )
-
-    prompt_data = {
-        "signals": json.dumps(signal_summary, indent=2, ensure_ascii=False),
-        "equity": equity,
-    }
-    prompt = template.invoke(prompt_data)
-
-    def create_default_output():
-        signals = {}
-        for ticker in tickers:
-            price = ticker_analysis.get(ticker, {}).get("current_price", 0)
-            signals[ticker] = TradeSignal(
-                direction="wait",
-                entry_price=price,
-                stop_loss=0,
-                take_profit=0,
-                confidence=0,
-                risk_reward_ratio=0,
-                reasoning="No clear signal - insufficient data",
-                position_size_pct=0,
-            )
-        return ForexPortfolioOutput(signals=signals)
-
-    llm_out = call_llm(
-        prompt=prompt,
-        pydantic_model=ForexPortfolioOutput,
-        agent_name=agent_id,
-        state=state,
-        default_factory=create_default_output,
-    )
-
-    return llm_out
+    # Generate deterministic signals based on analyst consensus
+    # This ensures we ALWAYS generate signals, even if LLM fails
+    signals = {}
+    for ticker, data in signal_summary.items():
+        price = data["price"]
+        consensus = data["consensus"]
+        confidence = data["avg_confidence"]
+        
+        # Determine direction based on consensus and confidence
+        if consensus == "bullish" and confidence >= 70:
+            direction = "long"
+            # Set SL 0.15% below entry, TP 0.30% above (1:2 risk/reward)
+            stop_loss = price * 0.9985
+            take_profit = price * 1.0030
+            risk_reward = 2.0
+            reasoning = f"Strong bullish consensus ({confidence}% avg confidence)"
+            position_size = min(3.0, max(0.5, confidence / 30))
+        elif consensus == "bearish" and confidence >= 70:
+            direction = "short"
+            # Set SL 0.15% above entry, TP 0.30% below (1:2 risk/reward)
+            stop_loss = price * 1.0015
+            take_profit = price * 0.9970
+            risk_reward = 2.0
+            reasoning = f"Strong bearish consensus ({confidence}% avg confidence)"
+            position_size = min(3.0, max(0.5, confidence / 30))
+        else:
+            direction = "wait"
+            stop_loss = 0
+            take_profit = 0
+            risk_reward = 0
+            reasoning = f"Mixed signals or low confidence ({confidence}%)"
+            position_size = 0
+        
+        signals[ticker] = TradeSignal(
+            direction=direction,
+            entry_price=round(price, 5),
+            stop_loss=round(stop_loss, 5),
+            take_profit=round(take_profit, 5),
+            confidence=confidence,
+            risk_reward_ratio=risk_reward,
+            reasoning=reasoning,
+            position_size_pct=round(position_size, 1),
+        )
+    
+    return ForexPortfolioOutput(signals=signals)
