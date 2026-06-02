@@ -7,6 +7,7 @@ import { PortfolioManagerNode } from './components/portfolio-manager-node';
 import { PortfolioStartNode } from './components/portfolio-start-node';
 import { StockAnalyzerNode } from './components/stock-analyzer-node';
 import { FxAnalyzerNode } from './components/fx-analyzer-node';
+import { FxPortfolioManagerNode } from './components/fx-portfolio-manager-node';
 import { type AppNode } from './types';
 
 // Types
@@ -58,4 +59,5 @@ export const nodeTypes = {
   'portfolio-manager-node': PortfolioManagerNode,
   'stock-analyzer-node': StockAnalyzerNode,
   'fx-analyzer-node': FxAnalyzerNode,
+  'fx-portfolio-manager-node': FxPortfolioManagerNode,
 } satisfies NodeTypes;

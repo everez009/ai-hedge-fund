@@ -67,8 +67,8 @@ const baseNodeTypeDefinitions: Record<string, NodeTypeDefinition> = {
   },
   "FX Portfolio Manager": {
     createNode: (position: { x: number, y: number }): AppNode => ({
-      id: `forex_portfolio_manager_${generateUniqueIdSuffix()}`,
-      type: "portfolio-manager-node",
+      id: `fx_portfolio_manager_${generateUniqueIdSuffix()}`,
+      type: "fx-portfolio-manager-node",
       position,
       data: {
         name: "FX Portfolio Manager",
