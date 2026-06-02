@@ -65,13 +65,26 @@ def forex_portfolio_manager(state: AgentState, agent_id: str = "forex_portfolio_
 
     progress.update_status(agent_id, None, "Generating trade signals")
 
-    # Get current price or use fallback
+    # Get current price - try multiple sources
     for ticker in tickers:
         if ticker_analysis[ticker]["current_price"] == 0:
             # Try to get from risk manager data
             risk_data = analyst_signals.get("risk_management_agent", {}).get(ticker, {})
             price = risk_data.get("current_price", 0)
             ticker_analysis[ticker]["current_price"] = price
+        
+        # If still 0, fetch it directly from Massive/Dukascopy
+        if ticker_analysis[ticker]["current_price"] == 0:
+            from src.tools.api import get_prices as fetch_prices
+            from datetime import datetime, timedelta
+            try:
+                end_date = datetime.now().strftime("%Y-%m-%d")
+                start_date = (datetime.now() - timedelta(days=3)).strftime("%Y-%m-%d")
+                recent_prices = fetch_prices(ticker, start_date, end_date, interval="5min")
+                if recent_prices:
+                    ticker_analysis[ticker]["current_price"] = recent_prices[-1].close
+            except Exception as e:
+                pass
 
     result = generate_trade_signals(
         tickers=tickers,
@@ -124,12 +137,13 @@ def generate_trade_signals(
                 "system",
                 "You are an expert FX/indices/commodities trader specializing in 5-min timeframe scalping.\n"
                 "Analyze the aggregated analyst signals and current price to generate precise entry, TP, and SL levels.\n"
+                "IMPORTANT: You MUST generate actual trade signals (long/short) when analyst confidence is high (≥70%).\n"
+                "Do NOT default to 'wait' if there's clear directional bias from analysts.\n"
                 "For scalping on 5-min:\n"
-                "- Stop loss should be 1.5-3x ATR or recent swing high/low\n"
+                "- Stop loss should be 1.5-3x ATR or recent swing high/low (10-30 pips for FX, 5-15 points for indices)\n"
                 "- Take profit should give minimum 1:1.5 risk/reward ratio\n"
                 "- Position size 0.5-3% of equity per trade\n"
-                "- Only signal 'long' or 'short' if strong confluence (≥60% confidence)\n"
-                "- Use 'wait' if signals are conflicting or weak\n"
+                "- Only use 'wait' if signals are truly conflicting (bullish and bearish cancel out)\n"
                 "Return JSON only with exact schema."
             ),
             (
@@ -145,6 +159,13 @@ def generate_trade_signals(
                 "- risk_reward_ratio: (TP-Entry)/(Entry-SL) for long, (Entry-TP)/(SL-Entry) for short\n"
                 "- reasoning: concise reasoning (max 150 chars)\n"
                 "- position_size_pct: 0.5-5.0% of equity\n\n"
+                "EXAMPLE:\n"
+                '{{\n'
+                '  "signals": {{\n'
+                '    "GBPJPY": {{"direction":"long","entry_price":198.452,"stop_loss":198.352,"take_profit":198.752,"confidence":85,"risk_reward_ratio":3.0,"reasoning":"Strong bullish consensus from scalper (95%) and daytrader (90%)","position_size_pct":2.0}}\n'
+                "  }}\n"
+                "}}\n\n"
+                "Now generate signals for the following:\n"
                 "Format:\n"
                 "{{\n"
                 '  "signals": {{\n'

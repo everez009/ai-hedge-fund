@@ -27,11 +27,26 @@ def risk_management_agent(state: AgentState, agent_id: str = "risk_management_ag
     for ticker in all_tickers:
         progress.update_status(agent_id, ticker, "Fetching price data and calculating volatility")
         
+        # Try to get daily data first (need 30+ days for proper volatility)
+        # If the requested range is too short, extend it for volatility calculation
+        from datetime import datetime, timedelta
+        try:
+            start_dt = datetime.strptime(data["start_date"], "%Y-%m-%d")
+            end_dt = datetime.strptime(data["end_date"], "%Y-%m-%d")
+            # Ensure at least 30 days of history for volatility
+            if (end_dt - start_dt).days < 30:
+                volatility_start = (end_dt - timedelta(days=30)).strftime("%Y-%m-%d")
+            else:
+                volatility_start = data["start_date"]
+        except:
+            volatility_start = data["start_date"]
+        
         prices = get_prices(
             ticker=ticker,
-            start_date=data["start_date"],
+            start_date=volatility_start,
             end_date=data["end_date"],
             api_key=api_key,
+            interval="1day",  # Explicitly request daily for volatility
         )
 
         if not prices:
