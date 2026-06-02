@@ -157,6 +157,12 @@ async def run(request_data: HedgeFundRequest, request: Request, db: Session = De
     except HTTPException as e:
         raise e
     except Exception as e:
+        import traceback
+        print(f"\n===== HEDGE FUND RUN ERROR =====")
+        print(f"Error: {e}")
+        print(f"Traceback:")
+        traceback.print_exc()
+        print(f"================================\n")
         raise HTTPException(status_code=500, detail=f"An error occurred while processing the request: {str(e)}")
 
 @router.post(

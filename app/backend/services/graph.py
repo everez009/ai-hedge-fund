@@ -58,7 +58,7 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
         if base_agent_key == "portfolio_manager":
             portfolio_manager_nodes.add(unique_agent_id)
             continue
-        if base_agent_key == "forex_portfolio_manager":
+        if base_agent_key in ("forex_portfolio_manager", "fx_portfolio_manager"):
             forex_portfolio_manager_nodes.add(unique_agent_id)
             continue
             
@@ -115,15 +115,13 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
             
             # Check if this is a direct connection from analyst to portfolio manager
             if (source_base_key in ANALYST_CONFIG and 
-                source_base_key != "portfolio_manager" and 
-                source_base_key != "forex_portfolio_manager" and 
+                source_base_key not in ("portfolio_manager", "forex_portfolio_manager", "fx_portfolio_manager") and
                 target_base_key == "portfolio_manager"):
                 # Don't add direct edge to portfolio manager - we'll route through risk manager
                 direct_to_portfolio_managers[edge.source] = edge.target
             elif (source_base_key in ANALYST_CONFIG and 
-                  source_base_key != "portfolio_manager" and 
-                  source_base_key != "forex_portfolio_manager" and 
-                  target_base_key == "forex_portfolio_manager"):
+                  source_base_key not in ("portfolio_manager", "forex_portfolio_manager", "fx_portfolio_manager") and
+                  target_base_key in ("forex_portfolio_manager", "fx_portfolio_manager")):
                 # Route through risk manager for forex portfolio manager too
                 direct_to_portfolio_managers[edge.source] = edge.target
             else:
@@ -134,7 +132,7 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
     for agent_id in agent_ids:
         if agent_id not in nodes_with_incoming_edges:
             base_agent_key = extract_base_agent_key(agent_id)
-            if base_agent_key in ANALYST_CONFIG and base_agent_key not in ("portfolio_manager", "forex_portfolio_manager"):
+            if base_agent_key in ANALYST_CONFIG and base_agent_key not in ("portfolio_manager", "forex_portfolio_manager", "fx_portfolio_manager"):
                 graph.add_edge("start_node", agent_id)
     
     # Connect analysts that have direct connections to portfolio managers to their corresponding risk managers
