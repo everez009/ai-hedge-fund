@@ -72,13 +72,16 @@ def _to_massive_ticker(symbol: str) -> str:
     if len(s) == 6 and s.isalpha():
         return f"C:{s}"
 
-    # Commodities: XAUUSD/XAGUSD spot prices are NOT available on Massive.
-    # I:XAU is a gold-mining stock index (~187), NOT spot gold (~$4,500).
-    # Return None so the caller can skip Massive and fall through to Dukascopy.
-    if s.startswith("XAU") or s.startswith("XAG") or s.startswith("XPT") or s.startswith("XPD"):
-        return None
+    # Commodities: XAUUSD/XAGUSD spot prices are available as C:XAUUSD, C:XAGUSD
+    # (NOT I:XAU which is a gold-mining stock index ~187)
+    if s.startswith("XAU"):
+        return "C:XAUUSD"  # Spot gold via forex endpoint
+    if s.startswith("XAG"):
+        return "C:XAGUSD"  # Spot silver via forex endpoint
+    if s.startswith("XPT") or s.startswith("XPD"):
+        return None  # Platinum/Palladium not available
     if s in ("WTI", "BRENT", "NATGAS", "COPPER"):
-        return None
+        return None  # Energy/metals not available as forex
 
     # Crypto
     if s in ("BTCUSD", "BTCEUR"):

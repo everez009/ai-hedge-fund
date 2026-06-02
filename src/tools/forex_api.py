@@ -100,15 +100,15 @@ class ForexDataProvider:
             return self._get_from_source(source, symbol, start_date, end_date, symbol_type)
         
         # Try each adapter in priority order
-        # For indices, use Massive first (best coverage), then iTick, TwelveData
-        # For forex, prefer Dukascopy (free tick data), then Massive, TwelveData, OANDA
-        # For commodities, prefer Dukascopy (free tick data), then TwelveData (Massive I:XAU is not spot)
+        # Indices:    Massive (primary) -> TwelveData -> iTick -> Dukascopy -> OANDA
+        # Forex:      Massive (primary) -> TwelveData -> Dukascopy -> iTick -> OANDA
+        # Commodities: Massive (primary, C:XAUUSD is spot gold) -> Dukascopy -> TwelveData -> iTick -> OANDA
         if symbol_type == "index":
-            priority_order = ["massive", "itick", "dukascopy", "twelvedata", "oanda"]
+            priority_order = ["massive", "twelvedata", "itick", "dukascopy", "oanda"]
         elif symbol_type == "commodity":
-            priority_order = ["dukascopy", "twelvedata", "itick", "oanda"]
-        else:
-            priority_order = ["dukascopy", "massive", "twelvedata", "itick", "oanda"]
+            priority_order = ["massive", "dukascopy", "twelvedata", "itick", "oanda"]
+        else:  # forex
+            priority_order = ["massive", "twelvedata", "dukascopy", "itick", "oanda"]
         
         for adapter_name in priority_order:
             if adapter_name in self.adapters:
