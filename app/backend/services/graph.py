@@ -6,6 +6,7 @@ from langgraph.graph import END, StateGraph
 
 from app.backend.services.agent_service import create_agent_function
 from src.agents.portfolio_manager import portfolio_management_agent
+from src.agents.forex_portfolio_manager import forex_portfolio_manager
 from src.agents.risk_manager import risk_management_agent
 from src.main import start
 from src.utils.analysts import ANALYST_CONFIG
@@ -47,6 +48,7 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
     
     # Track which nodes are portfolio managers for special handling
     portfolio_manager_nodes = set()
+    forex_portfolio_manager_nodes = set()
     
     # Add agent nodes
     for unique_agent_id in agent_ids:
@@ -55,6 +57,9 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
         # Track portfolio manager nodes for special handling (before ANALYST_CONFIG check)
         if base_agent_key == "portfolio_manager":
             portfolio_manager_nodes.add(unique_agent_id)
+            continue
+        if base_agent_key == "forex_portfolio_manager":
+            forex_portfolio_manager_nodes.add(unique_agent_id)
             continue
             
         # Skip if the base agent key is not in our analyst configuration
@@ -79,6 +84,20 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
         # Add the risk manager node
         risk_manager_function = create_agent_function(risk_management_agent, risk_manager_id)
         graph.add_node(risk_manager_id, risk_manager_function)
+    
+    # Add forex portfolio manager nodes (same risk manager pattern)
+    for forex_pm_id in forex_portfolio_manager_nodes:
+        forex_pm_function = create_agent_function(forex_portfolio_manager, forex_pm_id)
+        graph.add_node(forex_pm_id, forex_pm_function)
+        
+        # Create unique risk manager for this forex portfolio manager
+        suffix = forex_pm_id.split('_')[-1]
+        risk_manager_id = f"risk_management_agent_{suffix}"
+        risk_manager_nodes[forex_pm_id] = risk_manager_id
+        
+        # Add the risk manager node
+        risk_manager_function = create_agent_function(risk_management_agent, risk_manager_id)
+        graph.add_node(risk_manager_id, risk_manager_function)
 
     # Build connections based on React Flow graph structure
     nodes_with_incoming_edges = set()
@@ -97,8 +116,15 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
             # Check if this is a direct connection from analyst to portfolio manager
             if (source_base_key in ANALYST_CONFIG and 
                 source_base_key != "portfolio_manager" and 
+                source_base_key != "forex_portfolio_manager" and 
                 target_base_key == "portfolio_manager"):
                 # Don't add direct edge to portfolio manager - we'll route through risk manager
+                direct_to_portfolio_managers[edge.source] = edge.target
+            elif (source_base_key in ANALYST_CONFIG and 
+                  source_base_key != "portfolio_manager" and 
+                  source_base_key != "forex_portfolio_manager" and 
+                  target_base_key == "forex_portfolio_manager"):
+                # Route through risk manager for forex portfolio manager too
                 direct_to_portfolio_managers[edge.source] = edge.target
             else:
                 # Add edge between agent nodes (but not direct to portfolio managers)
@@ -108,7 +134,7 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
     for agent_id in agent_ids:
         if agent_id not in nodes_with_incoming_edges:
             base_agent_key = extract_base_agent_key(agent_id)
-            if base_agent_key in ANALYST_CONFIG and base_agent_key != "portfolio_manager":
+            if base_agent_key in ANALYST_CONFIG and base_agent_key not in ("portfolio_manager", "forex_portfolio_manager"):
                 graph.add_edge("start_node", agent_id)
     
     # Connect analysts that have direct connections to portfolio managers to their corresponding risk managers
@@ -123,6 +149,8 @@ def create_graph(graph_nodes: list, graph_edges: list) -> StateGraph:
     # Connect portfolio managers to END
     for portfolio_manager_id in portfolio_manager_nodes:
         graph.add_edge(portfolio_manager_id, END)
+    for forex_pm_id in forex_portfolio_manager_nodes:
+        graph.add_edge(forex_pm_id, END)
 
     # Set the entry point to the start node
     graph.set_entry_point("start_node")
