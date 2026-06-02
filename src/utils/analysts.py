@@ -1,7 +1,6 @@
 """Constants and utilities related to analysts configuration."""
 
 from src.agents import portfolio_manager
-from src.agents.forex_portfolio_manager import forex_portfolio_manager
 from src.agents.aswath_damodaran import aswath_damodaran_agent
 from src.agents.ben_graham import ben_graham_agent
 from src.agents.bill_ackman import bill_ackman_agent
@@ -228,14 +227,6 @@ ANALYST_CONFIG = {
         "agent_func": crypto_analyst_agent,
         "type": "analyst",
         "order": 21,
-    },
-    "forex_portfolio_manager": {
-        "display_name": "FX Portfolio Manager",
-        "description": "FX/Indices/Commodities Portfolio Manager for 5-min scalping",
-        "investing_style": "Generates entry, TP, and SL signals for FX, indices, and commodities based on 5-min timeframe analysis. Focuses on risk/reward optimization and position sizing.",
-        "agent_func": forex_portfolio_manager,
-        "type": "portfolio_manager",
-        "order": 24,
     },
 }
 

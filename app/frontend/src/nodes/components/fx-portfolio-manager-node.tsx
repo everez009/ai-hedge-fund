@@ -124,13 +124,19 @@ export function FxPortfolioManagerNode({
                 </div>
               </div>
               <div className='flex flex-col gap-2'>
-                {outputNodeData && (
-                  <Button
-                    size="sm"
-                    onClick={() => setIsDialogOpen(true)}
-                  >
-                    View Trade Signals
-                  </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    console.log('[FX PM] Button clicked, outputNodeData:', outputNodeData);
+                    setIsDialogOpen(true);
+                  }}
+                >
+                  View Trade Signals
+                </Button>
+                {!outputNodeData && (
+                  <div className="text-xs text-muted-foreground">
+                    Run the flow to generate signals
+                  </div>
                 )}
               </div>
               <div className="flex flex-col gap-2">
