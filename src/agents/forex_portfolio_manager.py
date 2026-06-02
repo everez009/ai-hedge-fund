@@ -55,6 +55,12 @@ def forex_portfolio_manager(state: AgentState, agent_id: str = "forex_portfolio_
                     "signal": sig_data.get("signal", "neutral"),
                     "confidence": sig_data.get("confidence", 50),
                 }
+        
+        # DEBUG: Log what signals we found
+        if ticker_signals:
+            print(f"[FX PM] {ticker}: Found {len(ticker_signals)} analyst signals: {list(ticker_signals.keys())}")
+        else:
+            print(f"[FX PM] {ticker}: WARNING - No analyst signals found!")
 
         ticker_analysis[ticker] = {
             "signals": ticker_signals,
@@ -201,5 +207,8 @@ def generate_trade_signals(
             reasoning=reasoning,
             position_size_pct=round(position_size, 1),
         )
+        
+        print(f"[FX PM] {ticker}: {direction.upper()} @ {price:.5f}, SL={stop_loss:.5f}, TP={take_profit:.5f}, Conf={confidence}%")
     
+    print(f"[FX PM] Generated {len(signals)} trade signals total")
     return ForexPortfolioOutput(signals=signals)

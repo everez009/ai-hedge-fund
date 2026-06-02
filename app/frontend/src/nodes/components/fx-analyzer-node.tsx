@@ -27,7 +27,11 @@ export function FxAnalyzerNode({
   // Use persistent state hooks
   const [tickers, setTickers] = useNodeState(id, 'tickers', 'XAUUSD,GBPJPY,USDJPY');
   const [runMode] = useNodeState(id, 'runMode', 'single');
-  const [startDate, setStartDate] = useNodeState(id, 'startDate', threeMonthsAgo.toISOString().split('T')[0]);
+  // For live trading, use last 5 days. For backtest, use 3 months.
+  const defaultStartDate = runMode === 'backtest' 
+    ? threeMonthsAgo.toISOString().split('T')[0]
+    : new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const [startDate, setStartDate] = useNodeState(id, 'startDate', defaultStartDate);
   const [endDate, setEndDate] = useNodeState(id, 'endDate', today.toISOString().split('T')[0]);
   
   const { currentFlowId } = useFlowContext();
