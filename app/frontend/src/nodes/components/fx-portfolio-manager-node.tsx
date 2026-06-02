@@ -127,7 +127,25 @@ export function FxPortfolioManagerNode({
                 <Button
                   size="sm"
                   onClick={() => {
-                    console.log('[FX PM] Button clicked, outputNodeData:', outputNodeData);
+                    console.log('[FX PM] Button clicked');
+                    console.log('[FX PM] outputNodeData:', outputNodeData);
+                    const data = outputNodeData as any;
+                    console.log('[FX PM] Object keys:', Object.keys(data || {}));
+                    console.log('[FX PM] Has messages:', !!data?.messages);
+                    console.log('[FX PM] Messages length:', data?.messages?.length);
+                    if (data?.messages?.length > 0) {
+                      const lastMsg = data.messages[data.messages.length - 1];
+                      console.log('[FX PM] Last message:', lastMsg);
+                      console.log('[FX PM] Last message content type:', typeof lastMsg?.content);
+                      console.log('[FX PM] Last message content:', lastMsg?.content);
+                    }
+                    // Log all properties to see what we have
+                    if (data) {
+                      console.log('[FX PM] All properties:');
+                      for (const key in data) {
+                        console.log(`  ${key}:`, data[key]);
+                      }
+                    }
                     setIsDialogOpen(true);
                   }}
                 >

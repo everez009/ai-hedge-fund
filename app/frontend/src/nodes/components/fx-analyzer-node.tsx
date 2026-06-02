@@ -211,11 +211,6 @@ export function FxAnalyzerNode({
           <Input value={tickers} onChange={handleTickersChange} placeholder="XAUUSD,GBPJPY,USDJPY" />
 
           <div className="flex gap-2">
-            <Input type="date" value={startDate} onChange={handleStartDateChange} />
-            <Input type="date" value={endDate} onChange={handleEndDateChange} />
-          </div>
-
-          <div className="flex gap-2">
             <Button onClick={handlePlay} disabled={!canRunHedgeFund} size="sm">Run</Button>
             <Button variant="ghost" onClick={handleStop} size="sm">Stop</Button>
           </div>

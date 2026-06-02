@@ -15,7 +15,16 @@ export function FxTradeSignalDialog({
   // Parse the trade signals from output data
   let signals: any[] = [];
   try {
-    if (outputNodeData?.messages && outputNodeData.messages.length > 0) {
+    // FX Portfolio Manager stores signals in 'decisions' property
+    if (outputNodeData?.decisions && typeof outputNodeData.decisions === 'object') {
+      signals = Object.entries(outputNodeData.decisions).map(([ticker, signal]: [string, any]) => ({
+        ticker,
+        ...signal,
+      }));
+      console.log('[FX Trade Signal Dialog] Parsed signals from decisions:', signals);
+    }
+    // Fallback: also check messages property (for compatibility)
+    else if (outputNodeData?.messages && outputNodeData.messages.length > 0) {
       const lastMessage = outputNodeData.messages[outputNodeData.messages.length - 1];
       if (lastMessage?.content) {
         const parsed = typeof lastMessage.content === 'string' 

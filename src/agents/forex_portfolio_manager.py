@@ -172,22 +172,41 @@ def generate_trade_signals(
         consensus = data["consensus"]
         confidence = data["avg_confidence"]
         
+        # Determine SL/TP based on asset volatility
+        # High volatility assets (crypto, gold) need wider stops
+        ticker_upper = ticker.upper()
+        if any(x in ticker_upper for x in ['BTC', 'ETH', 'XAU', 'GOLD', 'XAG', 'SILVER']):
+            # High volatility: 1.0% SL, 2.0% TP (1:2 risk/reward)
+            sl_pct = 0.010  # 1.0%
+            tp_pct = 0.020  # 2.0%
+            asset_type = "high_vol"
+        elif any(x in ticker_upper for x in ['US30', 'SPX', 'NAS', 'DJI', 'NDX', 'DOW']):
+            # Medium volatility (indices): 0.5% SL, 1.0% TP
+            sl_pct = 0.005  # 0.5%
+            tp_pct = 0.010  # 1.0%
+            asset_type = "medium_vol"
+        else:
+            # Low volatility (forex pairs): 0.15% SL, 0.30% TP
+            sl_pct = 0.0015  # 0.15%
+            tp_pct = 0.0030  # 0.30%
+            asset_type = "low_vol"
+        
         # Determine direction based on consensus and confidence
         if consensus == "bullish" and confidence >= 70:
             direction = "long"
-            # Set SL 0.15% below entry, TP 0.30% above (1:2 risk/reward)
-            stop_loss = price * 0.9985
-            take_profit = price * 1.0030
+            # Set SL below entry, TP above (1:2 risk/reward)
+            stop_loss = price * (1 - sl_pct)
+            take_profit = price * (1 + tp_pct)
             risk_reward = 2.0
-            reasoning = f"Strong bullish consensus ({confidence}% avg confidence)"
+            reasoning = f"Strong bullish consensus ({confidence}% avg confidence, {asset_type})"
             position_size = min(3.0, max(0.5, confidence / 30))
         elif consensus == "bearish" and confidence >= 70:
             direction = "short"
-            # Set SL 0.15% above entry, TP 0.30% below (1:2 risk/reward)
-            stop_loss = price * 1.0015
-            take_profit = price * 0.9970
+            # Set SL above entry, TP below (1:2 risk/reward)
+            stop_loss = price * (1 + sl_pct)
+            take_profit = price * (1 - tp_pct)
             risk_reward = 2.0
-            reasoning = f"Strong bearish consensus ({confidence}% avg confidence)"
+            reasoning = f"Strong bearish consensus ({confidence}% avg confidence, {asset_type})"
             position_size = min(3.0, max(0.5, confidence / 30))
         else:
             direction = "wait"
