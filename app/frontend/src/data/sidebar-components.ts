@@ -67,6 +67,7 @@ export const getComponentGroups = async (): Promise<ComponentGroup[]> => {
       iconColor: "text-green-500",
       items: [
         { name: "Portfolio Manager", icon: Brain },
+        { name: "FX Portfolio Manager", icon: Brain },
         // { name: "JSON Output", icon: FileJson },
         // { name: "Investment Report", icon: FileText },
       ]

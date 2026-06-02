@@ -65,6 +65,18 @@ const baseNodeTypeDefinitions: Record<string, NodeTypeDefinition> = {
       },
     }),
   },
+  "FX Portfolio Manager": {
+    createNode: (position: { x: number, y: number }): AppNode => ({
+      id: `forex_portfolio_manager_${generateUniqueIdSuffix()}`,
+      type: "portfolio-manager-node",
+      position,
+      data: {
+        name: "FX Portfolio Manager",
+        description: "Generates entry, TP, and SL signals for FX, indices, and commodities based on 5-min timeframe analysis.",
+        status: "Idle",
+      },
+    }),
+  },
   "Stock Input": {
     createNode: (position: { x: number, y: number }): AppNode => ({
       id: `stock-analyzer-node_${generateUniqueIdSuffix()}`,
